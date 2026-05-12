@@ -104,20 +104,21 @@ export default function ARGlasses() {
       const glasses = glassesCatalog[selectedIndexRef.current];
       if (!glasses || !glasses.image) return;
 
-      // Extract key facial landmarks
-      // Landmark 33 is left eye (from user perspective, so right on screen if not mirrored)
-      // Landmark 263 is right eye
-      // Landmark 168 is nose bridge
-      let ptLeft = landmarks[33];
-      let ptRight = landmarks[263];
-      const nose = landmarks[168];
+      // Left eye on unmirrored screen (User's right eye)
+      // fallback to [362, 263, 386, 374] average if pupil not available
+      const ptLeft = landmarks.length >= 478 ? landmarks[468] : {
+        x: (landmarks[362].x + landmarks[263].x + landmarks[386].x + landmarks[374].x) / 4,
+        y: (landmarks[362].y + landmarks[263].y + landmarks[386].y + landmarks[374].y) / 4,
+      };
 
-      // Ensure ptLeft is physically smaller X on image (left on screen) to avoid flipped angles
-      if (ptLeft.x > ptRight.x) {
-        const temp = ptLeft;
-        ptLeft = ptRight;
-        ptRight = temp;
-      }
+      // Right eye on unmirrored screen (User's left eye)
+      // fallback to [133, 33, 159, 145] average
+      const ptRight = landmarks.length >= 478 ? landmarks[473] : {
+        x: (landmarks[133].x + landmarks[33].x + landmarks[159].x + landmarks[145].x) / 4,
+        y: (landmarks[133].y + landmarks[33].y + landmarks[159].y + landmarks[145].y) / 4,
+      };
+
+      const nose = landmarks[168];
 
       // Convert normalized points [0, 1] to pixel coordinates
       const leftX = ptLeft.x * width;
@@ -127,30 +128,34 @@ export default function ARGlasses() {
       const noseX = nose.x * width;
       const noseY = nose.y * height;
 
-      // Calculate glasses scale and angle
+      // Calculate pupillary distance (PD) and angle
       const dx = rightX - leftX;
       const dy = rightY - leftY;
-      const eyeDist = Math.hypot(dx, dy);
+      const pd = Math.hypot(dx, dy);
       const angle = Math.atan2(dy, dx);
       
-      // Calculate drawing dimensions
-      const rWidth = eyeDist * glasses.widthRatio;
+      // Calculate drawing dimensions relative to User's PD
+      const rWidth = pd * glasses.widthRatio;
       const imageRatio = glasses.image.height / glasses.image.width;
       const rHeight = rWidth * imageRatio;
 
-      // Adjust drawing position based on nose
-      // Offset slightly to align on the bridge correctly
-      const adjustedNoseY = noseY + (rHeight * glasses.yOffset);
-
       ctx.save();
-      ctx.translate(noseX, adjustedNoseY);
+      
+      // Translate to nose bridge landmark
+      ctx.translate(noseX, noseY);
+      
+      // Rotate by the angle between the two eyes
       ctx.rotate(angle);
       
-      // Draw image centered at nose position
+      // Calculate Y starting coordinate.
+      // yOffset positive shifts the glasses DOWN.
+      const drawY = -rHeight / 2 + (rHeight * glasses.yOffset);
+
+      // Draw image centered horizontally on the nose bridge
       ctx.drawImage(
         glasses.image,
         -rWidth / 2,
-        -rHeight / 2,
+        drawY,
         rWidth,
         rHeight
       );
