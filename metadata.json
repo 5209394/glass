@@ -1,0 +1,8 @@
+{
+  "name": "AR Glasses Try-on",
+  "description": "An interactive Augmented Reality application that lets users try on different virtual glasses using their device's front-facing camera.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": []
+}
